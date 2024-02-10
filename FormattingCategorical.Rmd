@@ -1,0 +1,149 @@
+---
+title: "Formatting Categorical data in R"
+output: html_notebook
+---
+
+<img src="https://i.imgur.com/6U6q5jQ.png"/>
+
+# Formatting Categorical data in R
+
+
+In this formatting tutorial we will see the categorical case, let me open a file we created before about [Freedom Indices](https://en.wikipedia.org/wiki/List_of_freedom_indices):
+
+
+```{r}
+rm(list = ls())
+link='https://github.com/PythonVersusR/OperationsCleaning/raw/main/freedom_R.csv'
+allFree=read.csv(link)
+```
+
+Let's explore:
+
+
+```{r}
+str(allFree)
+```
+
+Notice that the clean numeric values were recognised as numeric (that may not always be the case, so always verify). When that is the case, statistics can be obtained:
+
+
+```{r}
+summary(allFree)
+```
+
+But the categories are still recognized as characters. Let´s check again the levels:
+
+
+```{r}
+allFree[,c(seq(2,ncol(allFree),2))]
+```
+
+Remembering the levels (it must have been previously cleaned):
+
+
+```{r}
+lapply(allFree[,c(seq(2,ncol(allFree),2))],unique)
+
+```
+
+Now, let's turn the values into **ordinal** categories. Remember that the worst, best and middle values should be comparable:
+
+
+```{r}
+# assign value so that worst and best is the same across levels
+
+# mapper1 = 'not free'~ 1 ,'partly free'~ 3,'free'~5
+# mapper2 = 'repressed'~1, 'mostly unfree'~2,'moderately free'~3, 'mostly free'~4, 'free'~5
+# mapper3 = 'very serious'~1, 'difficult'~2,'problematic'~3,'satisfactory'~4,'good'~5
+# mapper4 = 'authoritarian regime'~1,'hybrid regime'~2,'flawed democracy'~4, 'full democracy'~5
+
+allFree$FitW=dplyr::case_match(allFree$FitW,
+                               'not free'~ 1 ,'partly free'~ 3,'free'~5)
+
+allFree$IoEF=dplyr::case_match(allFree$IoEF,
+                               'repressed'~1, 'mostly unfree'~2,'moderately free'~3, 'mostly free'~4, 'free'~5)
+
+allFree$PFI=dplyr::case_match(allFree$PFI,
+                              'very serious'~1, 'difficult'~2,'problematic'~3,'satisfactory'~4,'good'~5)
+
+allFree$DI=dplyr::case_match(allFree$DI,
+                             'authoritarian regime'~1,'hybrid regime'~2,'flawed democracy'~4, 'full democracy'~5)
+```
+
+You see:
+
+
+```{r}
+allFree
+```
+
+
+```{r}
+#check types:
+str(allFree)
+```
+
+We have integers instead of categories. Let's create ordinal columns:
+
+
+```{r}
+# new column names
+newNames=paste0(names(allFree[,c(seq(2,ncol(allFree),2))]),'_or')
+newNames
+```
+
+
+```{r}
+# copy the previous values
+allFree[newNames]=allFree[,c(seq(2,ncol(allFree),2))]
+allFree
+```
+
+
+```{r}
+# turn integers into ordinal level
+ 
+allFree[,newNames]=lapply(allFree[,newNames],
+                          ordered, #function 
+                          levels=c(1,2,3,4,5),# current
+                          labels=c('1_veryLow','2_low','3_medium','4_good','5_veryGood')) #rename
+```
+
+
+```{r}
+allFree
+```
+
+Let's keep this last result, and let me show you the use of **RDS** format:
+
+
+```{r}
+#saving
+
+saveRDS(allFree,file.path("DataFiles","allFree.rds"))
+write.csv(allFree,file.path("DataFiles","allFree_R.csv"))
+```
+
+
+```{r}
+#reading
+
+rm(list = ls())
+
+dfRDS=readRDS(file.path("DataFiles","allFree.rds") )  
+dfCSV=read.csv(file.path("DataFiles","allFree_R.csv") )  
+```
+
+Now, notice the difference when you have categorical data:
+
+
+```{r}
+str(dfRDS)
+```
+
+
+```{r}
+str(dfCSV)
+```
+
+
