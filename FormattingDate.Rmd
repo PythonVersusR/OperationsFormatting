@@ -1,0 +1,288 @@
+<img src="https://i.imgur.com/6U6q5jQ.png"/>
+
+# Formatting Dates in R
+
+It is very common to find dates (some combination of year, month, day of week and time) in data that is collected in real time (and other that organize event information.
+
+Let's see a data frame that comes with dates from an API.
+
+
+
+```{r}
+rm(list = ls())
+#install.packages("jsonlite")
+library(jsonlite) 
+endPoint="https://data.seattle.gov/resource/kzjm-xkqj.json" 
+calls911 = fromJSON(endPoint)
+head(calls911)
+```
+
+
+
+Let's check the data types:
+
+
+```{r}
+names(calls911)
+
+```
+
+Let's get rid of some columns:
+
+
+```{r}
+calls911=calls911[,c(1:5)]
+```
+
+Let's check the column _datetime_:
+
+
+```{r}
+head(calls911$datetime)
+```
+
+
+```{r}
+# verify data type
+typeof(calls911$datetime[1])
+
+```
+
+The date and time information is not useful at this time, that is, the information it offers is of limited use, as it is just a string. 
+
+Let's make it useful with the help of the _lubridate_ package:
+
+
+```{r}
+library(lubridate)
+calls911$datetime=ymd_hms(calls911$datetime)
+str(calls911)
+```
+
+
+```{r}
+head(calls911)
+```
+
+Once you have this data type, you can retrieve important information:
+
+
+```{r}
+
+calls911$date=day(calls911$datetime)
+calls911$year=year(calls911$datetime)
+calls911$month=month(calls911$datetime,label = TRUE, abbr = FALSE)
+calls911$weekday=wday(calls911$datetime,label = TRUE, abbr = FALSE)
+calls911$hour=hour(calls911$datetime)
+```
+
+
+```{r}
+head(calls911)
+```
+
+Let's create a new column with what we have. In this case, a boolean where you tell if it is night time (after 8 pm before 6 am):
+
+
+```{r}
+calls911$nightTime=((calls911$hour<=6) | (calls911$hour>=20))
+```
+
+Let's save what we have:
+
+
+```{r}
+saveRDS(calls911,file = file.path("DataFiles","calls911.rds"))
+```
+
+What about data that comes in Spanish?
+
+
+```{r}
+library(rvest)
+
+link="https://es.wikipedia.org/wiki/Pandemia_de_COVID-19"
+
+#getting third table
+covid <- read_html(link)%>%html_nodes("table")%>%html_table()
+```
+
+Let me keep the third df:
+
+
+```{r}
+covidDF=covid[[3]]
+covidDF
+```
+
+Notice the presence of some non-English punctuation:
+
+
+```{r}
+names(covidDF)
+```
+
+Let's get rid of those:
+
+
+```{r}
+names(covidDF)=stringi::stri_trans_general(str = names(covidDF),id = "Latin-ASCII")
+names(covidDF)    
+
+```
+
+
+```{r}
+#and
+
+names(covidDF)=gsub(" ","",names(covidDF))
+names(covidDF)
+
+```
+Notice the repetition, then:
+```{r}
+names(covidDF)[2]="Territorios.1"
+```
+
+
+Let's  focus on the _Fechadelanalisis_ column:
+
+
+```{r}
+# use " a " to split:
+stringr::str_split_fixed(string = covidDF$Fechadelanalisis,pattern = " a ",n = 2)
+
+```
+
+
+```{r}
+# create the two columns
+
+covidDF[c("fecha1","fecha2")]=stringr::str_split_fixed(covidDF$Fechadelanalisis," a ",2)
+covidDF
+```
+
+Let's format one of those columns:
+
+
+```{r}
+covidDF$fecha1
+```
+
+
+```{r}
+covidDF[9,'fecha1']='1 de noviembre de 2020'
+```
+
+
+```{r}
+# let's split again:
+stringr::str_split_fixed(covidDF$fecha1," de ",3)
+```
+
+I could create three new columns:
+
+
+```{r}
+covidDF[,c('fecha1_dia','fecha1_mes','fecha1_anho')]=stringr::str_split_fixed(covidDF$fecha1," de ",3)
+covidDF[,c('fecha1_dia','fecha1_mes','fecha1_anho')]
+```
+
+We should use the month number instead of name. Let's prepare a dict of changes:
+
+
+```{r}
+monthName=c('enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre')
+monthNumber=seq(1:12)
+changes=data.frame(monthName,monthNumber)
+changes
+```
+
+
+```{r}
+covidDF=merge(covidDF,changes,by.x = 'fecha1_mes',by.y = 'monthName')
+```
+
+Now we have:
+
+
+```{r}
+covidDF[,c('fecha1_dia','monthNumber','fecha1_anho')]
+```
+
+We will use those columns to create a date:
+
+
+```{r}
+make_date(covidDF$fecha1_anho, covidDF$monthNumber, covidDF$fecha1_dia)
+```
+
+
+```{r}
+covidDF$newDate=make_date(covidDF$fecha1_anho, covidDF$monthNumber, covidDF$fecha1_dia)
+```
+
+```{r}
+# data types
+
+str(covidDF)
+```
+Note the presence of numeric columns:
+```{r}
+covidDF[,c('Porcentajeconanticuerpos','Personasquehansidoinfectadas')]
+```
+Let's clean and **format**:
+```{r}
+
+sapply(covidDF[,c(5,6)],function(x) gsub("\\%|\\s","",x,fixed = F))
+```
+The code has a problem to get rid of the space in the second column (only in one case worked), let's clean the first one:
+
+```{r}
+covidDF[,c(5)]=sapply(covidDF[,c(5)],function(x) gsub("\\%|\\s","",x,fixed = F))
+covidDF[,c(5)]=sapply(covidDF[,c(5)],function(x) gsub("\\,",".",x,fixed = F))
+covidDF[,c(5)]
+```
+What is this symbol:
+
+```{r}
+# one cell
+covidDF[,c(6)][1]
+```
+```{r}
+# the character
+substring(covidDF[,c(6)][1],4,4)
+```
+
+What is the ascii code?
+```{r}
+charToRaw(substring(covidDF[,c(6)][1],4,4))
+
+```
+
+```{r}
+# and for this one?
+charToRaw(" ")
+```
+That is different space (non-breaking space). Also you can try:
+```{r}
+bittermelon::str2ucp(substring(covidDF[,c(6)][1],4,4))
+```
+Then,
+```{r}
+covidDF[,c(6)]=sapply(covidDF[,c(6)],function(x) gsub("\\\u00A0|\\s","",x,fixed = F))
+```
+
+So,
+```{r}
+covidDF[,c('Porcentajeconanticuerpos','Personasquehansidoinfectadas')]
+```
+Finally,
+
+```{r}
+covidDF[,c(5,6)]=lapply(covidDF[,c(5,6)],as.numeric)
+
+# see
+str(covidDF)
+```
+
