@@ -285,4 +285,27 @@ covidDF[,c(5,6)]=lapply(covidDF[,c(5,6)],as.numeric)
 # see
 str(covidDF)
 ```
+Dates as strings are in general translated easily if using the right  lubridate function:
 
+```{r}
+date='20240113'
+lubridate::ymd(date)
+```
+```{r}
+date='12112023'
+lubridate::dmy(date)
+```
+```{r}
+date='12nov2023'
+lubridate::dmy(date)
+```
+
+```{r}
+date='NOVEMBER122023'
+lubridate::mdy(date)
+```
+```{r}
+date='NOVEMBER1223'
+lubridate::mdy(date)
+```
+Keep this [link](https://docs.safe.com/fme/2017.0/html/FME_Desktop_Documentation/FME_Transformers_HelpPane/Transformers/dateformatter.htm) for reference.
